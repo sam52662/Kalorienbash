@@ -1,4 +1,4 @@
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-3.8-flash';
 
 export async function analyzeImage(apiKey, base64Image, mimeType) {
   const prompt = `Analysiere dieses Essen-Foto. Antworte NUR mit einem JSON-Objekt ohne Markdown-Blöcke:
