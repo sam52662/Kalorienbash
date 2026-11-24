@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 import { hashPassword, verifyPassword } from '../crypto.js';
 import { loadAuth, saveAuth } from '../github.js';
@@ -9,16 +9,35 @@ const PROFILES = [
 ];
 
 export default function ProfileLogin({ onLogin }) {
-  const [step, setStep]         = useState('select');   // select | password | setup | loading
-  const [profile, setProfile]   = useState(null);
+  const [githubToken, setGhToken] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kb-global') || '{}').githubToken || ''; } catch { return ''; }
+  });
+
+  // Start directly on the last-used profile if one is saved
+  const lastProfileId = (() => {
+    try { return JSON.parse(localStorage.getItem('kb-global') || '{}').lastProfile || null; } catch { return null; }
+  })();
+  const lastProfile = lastProfileId ? PROFILES.find(p => p.id === lastProfileId) || null : null;
+
+  const [step, setStep]   = useState(() => {
+    if (!lastProfile) return 'select';
+    if (!JSON.parse(localStorage.getItem('kb-global') || '{}').githubToken) return 'token';
+    return 'loading-auto';   // will trigger auto-load in useEffect
+  });
+  const [profile, setProfile]   = useState(lastProfile);
   const [pw, setPw]             = useState('');
   const [pw2, setPw2]           = useState('');
   const [showPw, setShowPw]     = useState(false);
   const [error, setError]       = useState('');
-  const [githubToken, setGhToken] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('kb-global') || '{}').githubToken || ''; } catch { return ''; }
-  });
   const [showToken, setShowToken] = useState(false);
+
+  // Auto-load auth for last-used profile on mount
+  useEffect(() => {
+    if (step !== 'loading-auto' || !lastProfile || !githubToken) return;
+    loadAuth(githubToken, lastProfile.id)
+      .then(auth => setStep(auth ? 'password' : 'setup'))
+      .catch(e => { setError('GitHub-Fehler: ' + e.message); setStep('select'); });
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function selectProfile(p) {
     setProfile(p); setError(''); setPw(''); setPw2('');
@@ -40,6 +59,9 @@ export default function ProfileLogin({ onLogin }) {
       const auth = await loadAuth(githubToken, profile.id);
       const ok = await verifyPassword(pw, auth.salt, auth.hash);
       if (!ok) { setError('Falsches Passwort.'); setStep('password'); return; }
+      const g = JSON.parse(localStorage.getItem('kb-global') || '{}');
+      g.lastProfile = profile.id;
+      localStorage.setItem('kb-global', JSON.stringify(g));
       onLogin({ profile: profile.id, label: profile.label, password: pw, githubToken });
     } catch (e) {
       setError(e.message); setStep('password');
@@ -53,6 +75,9 @@ export default function ProfileLogin({ onLogin }) {
     try {
       const authObj = await hashPassword(pw);
       await saveAuth(githubToken, profile.id, authObj);
+      const g = JSON.parse(localStorage.getItem('kb-global') || '{}');
+      g.lastProfile = profile.id;
+      localStorage.setItem('kb-global', JSON.stringify(g));
       onLogin({ profile: profile.id, label: profile.label, password: pw, githubToken });
     } catch (e) {
       setError(e.message); setStep('setup');
@@ -120,7 +145,12 @@ export default function ProfileLogin({ onLogin }) {
               icon={<Lock size={16} strokeWidth={2} color="#94a3b8" />} />
             {error && <ErrorBox msg={error} />}
             <ActionBtn label="Anmelden" color={profile.color} onClick={handleLogin} />
-            <BackBtn onClick={() => { setStep('select'); setError(''); setPw(''); }} />
+            <BackBtn onClick={() => {
+              const g = JSON.parse(localStorage.getItem('kb-global') || '{}');
+              delete g.lastProfile;
+              localStorage.setItem('kb-global', JSON.stringify(g));
+              setStep('select'); setError(''); setPw('');
+            }} />
           </>
         )}
 
