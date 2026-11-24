@@ -9,8 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Kalorienzähler',
-        short_name: 'Kalorien',
+        name: 'Kalorienbash',
+        short_name: 'Kalorienbash',
         description: 'KI-gestützter Kalorienzähler mit Foto-Erkennung',
         theme_color: '#16a34a',
         background_color: '#ffffff',

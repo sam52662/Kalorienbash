@@ -63,7 +63,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>🥗 Kalorienzähler</h1>
+        <h1>🥗 Kalorienbash</h1>
         <div className="header-right">
           <button
             style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.3rem', cursor: 'pointer' }}
