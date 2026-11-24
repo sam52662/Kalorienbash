@@ -1,10 +1,10 @@
-const MODEL = 'gemini-flash-latest';
-const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-3.8-flash'];
+const MODEL = 'gemini-3.8-flash';
+const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
 
 function isOverloaded(status, msg) {
-  return status === 503 || status === 429 || (msg || '').toLowerCase().includes('high demand') || (msg || '').toLowerCase().includes('overloaded');
+  return (status === 503 || status === 429) && !((msg || '').includes('no longer available'));
 }
 
 async function callAPI(apiKey, model, body, attempt = 0) {
