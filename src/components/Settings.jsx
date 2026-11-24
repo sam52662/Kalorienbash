@@ -1,19 +1,33 @@
 import { useState } from 'react';
-import { Bot, Link2, Target, ShieldCheck, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Bot, Target, ShieldCheck, CheckCircle, AlertTriangle, User } from 'lucide-react';
 
-export default function Settings({ apiKey, githubToken, goal, onSave }) {
+export default function Settings({ apiKey, githubToken, goal, onSave, profile, label }) {
   const [key, setKey] = useState(apiKey || '');
-  const [ghToken, setGhToken] = useState(githubToken || '');
   const [kcalGoal, setKcalGoal] = useState(goal || 2000);
   const [saved, setSaved] = useState(false);
 
+  const profileColor = profile === 'kai' ? '#15803d' : '#7c3aed';
+
   const handleSave = () => {
-    onSave(key.trim(), Number(kcalGoal), ghToken.trim());
+    onSave(key.trim(), Number(kcalGoal));
     setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
 
   return (
     <div className="page">
+      <div className="settings-card" style={{ borderLeft: `3px solid ${profileColor}` }}>
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 24, height: 24, borderRadius: '50%', background: profileColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <User size={13} strokeWidth={2} color="white" />
+          </div>
+          Aktives Profil
+        </h2>
+        <p className="settings-hint" style={{ marginTop: 4 }}>
+          Eingeloggt als <strong>{label}</strong> — Daten werden in <code>data/{profile}.csv</code> gespeichert.
+          {githubToken ? ' GitHub-Token aktiv.' : ' Kein GitHub-Token — nur lokale Speicherung.'}
+        </p>
+      </div>
+
       <div className="settings-card">
         <h2><Bot size={18} strokeWidth={2} color="#15803d" /> Gemini API-Key</h2>
         <label className="settings-label">Key von aistudio.google.com</label>
@@ -24,22 +38,6 @@ export default function Settings({ apiKey, githubToken, goal, onSave }) {
             ? <><CheckCircle size={13} strokeWidth={2} /> Key eingetragen</>
             : <><AlertTriangle size={13} strokeWidth={2} /> Kein Key — KI-Analyse nicht verfügbar</>}
         </div>
-      </div>
-
-      <div className="settings-card">
-        <h2><Link2 size={18} strokeWidth={2} color="#15803d" /> GitHub Token</h2>
-        <label className="settings-label">Personal Access Token für Verlauf-Speicherung</label>
-        <input className="settings-input" type="password" placeholder="github_pat_…" value={ghToken}
-          onChange={e => setGhToken(e.target.value)} autoComplete="off" />
-        <div className={`key-status ${ghToken ? 'ok' : 'missing'}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          {ghToken
-            ? <><CheckCircle size={13} strokeWidth={2} /> Token eingetragen — Verlauf wird in GitHub gespeichert</>
-            : <><AlertTriangle size={13} strokeWidth={2} /> Kein Token — Verlauf nur lokal</>}
-        </div>
-        <p className="settings-hint" style={{ marginTop: 6 }}>
-          Token mit <strong>repo</strong>-Berechtigung erstellen unter:<br />
-          github.com → Settings → Developer settings → Personal access tokens
-        </p>
       </div>
 
       <div className="settings-card">

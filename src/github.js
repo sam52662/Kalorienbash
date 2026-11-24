@@ -1,6 +1,5 @@
 const OWNER = 'sam52662';
 const REPO = 'Kalorienbash';
-const FILE_PATH = 'data/log.csv';
 const CSV_HEADER = 'datum,uhrzeit,name,kalorien\n';
 
 async function apiCall(token, method, path, body) {
@@ -20,58 +19,62 @@ async function apiCall(token, method, path, body) {
   return res.json();
 }
 
-async function getFile(token) {
+async function getFile(token, path, fallback = '') {
   try {
-    const data = await apiCall(token, 'GET', FILE_PATH);
+    const data = await apiCall(token, 'GET', path);
     const content = atob(data.content.replace(/\n/g, ''));
     return { content, sha: data.sha };
   } catch (e) {
     if (e.message.includes('Not Found') || e.message.includes('404')) {
-      return { content: CSV_HEADER, sha: null };
+      return { content: fallback, sha: null };
     }
     throw e;
   }
 }
 
-export async function appendEntry(token, entry) {
-  const { content, sha } = await getFile(token);
-  const line = `${entry.date},${entry.time},"${entry.name.replace(/"/g, '""')}",${entry.calories}\n`;
-  const newContent = content + line;
-  const encoded = btoa(unescape(encodeURIComponent(newContent)));
-
-  const body = {
-    message: `log: ${entry.date} ${entry.name} (${entry.calories} kcal)`,
-    content: encoded,
-    ...(sha ? { sha } : {}),
-  };
-
-  await apiCall(token, 'PUT', FILE_PATH, body);
+async function putFile(token, path, content, sha, message) {
+  const encoded = btoa(unescape(encodeURIComponent(content)));
+  await apiCall(token, 'PUT', path, { message, content: encoded, ...(sha ? { sha } : {}) });
 }
 
-export async function deleteEntry(token, entry) {
-  const { content, sha } = await getFile(token);
-  if (!sha) return;
+// ── Auth ──────────────────────────────────────────────
 
+export async function loadAuth(token, profile) {
+  const { content } = await getFile(token, `data/${profile}-auth.json`);
+  if (!content) return null;
+  try { return JSON.parse(content); } catch { return null; }
+}
+
+export async function saveAuth(token, profile, authObj) {
+  const { sha } = await getFile(token, `data/${profile}-auth.json`);
+  await putFile(token, `data/${profile}-auth.json`, JSON.stringify(authObj), sha, `auth: set password for ${profile}`);
+}
+
+// ── CSV entries ───────────────────────────────────────
+
+function csvPath(profile) { return `data/${profile}.csv`; }
+
+export async function appendEntry(token, entry, profile = 'default') {
+  const { content, sha } = await getFile(token, csvPath(profile), CSV_HEADER);
+  const line = `${entry.date},${entry.time},"${entry.name.replace(/"/g, '""')}",${entry.calories}\n`;
+  await putFile(token, csvPath(profile), content + line, sha, `log: ${entry.date} ${entry.name} (${entry.calories} kcal)`);
+}
+
+export async function deleteEntry(token, entry, profile = 'default') {
+  const { content, sha } = await getFile(token, csvPath(profile), CSV_HEADER);
+  if (!sha) return;
   const lines = content.split('\n');
   const filtered = lines.filter(line => {
     if (!line.trim() || line.startsWith('datum,')) return true;
     const cols = parseCsvLine(line);
     return !(cols[0] === entry.date && cols[1] === entry.time && cols[3] == entry.calories);
   });
-
-  const newContent = filtered.join('\n');
-  const encoded = btoa(unescape(encodeURIComponent(newContent)));
-  await apiCall(token, 'PUT', FILE_PATH, {
-    message: `delete: ${entry.date} ${entry.name}`,
-    content: encoded,
-    sha,
-  });
+  await putFile(token, csvPath(profile), filtered.join('\n'), sha, `delete: ${entry.date} ${entry.name}`);
 }
 
-export async function loadHistory(token) {
-  const { content } = await getFile(token);
+export async function loadHistory(token, profile = 'default') {
+  const { content } = await getFile(token, csvPath(profile), CSV_HEADER);
   const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('datum,'));
-
   const byDate = {};
   for (const line of lines) {
     const cols = parseCsvLine(line);
@@ -80,30 +83,20 @@ export async function loadHistory(token) {
     if (!byDate[date]) byDate[date] = [];
     byDate[date].push({ date, time, name, calories: Number(calories) });
   }
-
   return Object.entries(byDate)
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([date, entries]) => ({
-      date,
-      entries,
-      total: entries.reduce((s, e) => s + e.calories, 0),
-    }));
+    .map(([date, entries]) => ({ date, entries, total: entries.reduce((s, e) => s + e.calories, 0) }));
 }
 
 function parseCsvLine(line) {
-  const cols = [];
-  let cur = '';
-  let inQuote = false;
+  const cols = []; let cur = ''; let inQuote = false;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
     if (c === '"') {
       if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
       else inQuote = !inQuote;
-    } else if (c === ',' && !inQuote) {
-      cols.push(cur); cur = '';
-    } else {
-      cur += c;
-    }
+    } else if (c === ',' && !inQuote) { cols.push(cur); cur = ''; }
+    else cur += c;
   }
   cols.push(cur);
   return cols;

@@ -2,22 +2,25 @@ import { useState, useCallback } from 'react';
 import {
   Plus, Home, BarChart2, Settings as SettingsIcon,
   Flame, Target, UtensilsCrossed, CalendarDays, Trash2,
-  Utensils, CheckCircle, AlertCircle,
+  Utensils, CheckCircle, AlertCircle, LogOut, User,
 } from 'lucide-react';
 import AddFood from './components/AddFood';
-import FoodLog from './components/FoodLog';
 import History from './components/History';
 import Settings from './components/Settings';
+import ProfileLogin from './components/ProfileLogin';
 import './index.css';
 
-const STORAGE_KEY = 'calorie-tracker-data';
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
-function loadData() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+function storageKey(profile) { return `kb-${profile}`; }
+
+function loadProfileData(profile) {
+  try { return JSON.parse(localStorage.getItem(storageKey(profile)) || '{}'); }
   catch { return {}; }
 }
-function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function saveProfileData(profile, data) {
+  localStorage.setItem(storageKey(profile), JSON.stringify(data));
+}
 
 function WeekStrip() {
   const today = new Date();
@@ -86,23 +89,34 @@ function Gauge({ value, goal }) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('home');
-  const [entries, setEntries]         = useState(() => loadData().entries?.[todayKey()] || []);
-  const [apiKey, setApiKey]           = useState(() => loadData().apiKey || '');
-  const [githubToken, setGithubToken] = useState(() => loadData().githubToken || '');
-  const [goal, setGoal]               = useState(() => loadData().goal || 2000);
+  const [session, setSession] = useState(null); // { profile, label, password, githubToken }
+
+  function handleLogin(sess) { setSession(sess); }
+  function handleLogout() { setSession(null); }
+
+  if (!session) return <ProfileLogin onLogin={handleLogin} />;
+  return <MainApp session={session} onLogout={handleLogout} />;
+}
+
+function MainApp({ session, onLogout }) {
+  const { profile, label, githubToken } = session;
+
+  const [tab, setTab]             = useState('home');
+  const [entries, setEntries]     = useState(() => loadProfileData(profile).entries?.[todayKey()] || []);
+  const [apiKey, setApiKey]       = useState(() => loadProfileData(profile).apiKey || '');
+  const [goal, setGoal]           = useState(() => loadProfileData(profile).goal || 2000);
   const [editingGoal, setEditingGoal] = useState(false);
-  const [goalDraft, setGoalDraft]     = useState('');
-  const [syncStatus, setSyncStatus]   = useState(null);
+  const [goalDraft, setGoalDraft] = useState('');
+  const [syncStatus, setSyncStatus] = useState(null);
 
   const commitGoal = useCallback(() => {
     const val = parseInt(goalDraft, 10);
     if (val >= 100 && val <= 9999) {
       setGoal(val);
-      const d = loadData(); d.goal = val; saveData(d);
+      const d = loadProfileData(profile); d.goal = val; saveProfileData(profile, d);
     }
     setEditingGoal(false);
-  }, [goalDraft]);
+  }, [goalDraft, profile]);
 
   const totalCalories = entries.reduce((s, e) => s + e.calories, 0);
 
@@ -110,16 +124,16 @@ export default function App() {
     const full = { ...entry, date: todayKey() };
     setEntries(prev => {
       const next = [...prev, full];
-      const d = loadData();
+      const d = loadProfileData(profile);
       d.entries = { ...(d.entries || {}), [todayKey()]: next };
-      saveData(d); return next;
+      saveProfileData(profile, d); return next;
     });
     setTab('home');
     if (githubToken) {
       setSyncStatus({ msg: 'Speichere…', type: 'ok' });
       try {
         const { appendEntry } = await import('./github.js');
-        await appendEntry(githubToken, full);
+        await appendEntry(githubToken, full, profile);
         setSyncStatus({ msg: 'In GitHub gespeichert', type: 'ok' });
         setTimeout(() => setSyncStatus(null), 3000);
       } catch (e) {
@@ -127,39 +141,43 @@ export default function App() {
         setTimeout(() => setSyncStatus(null), 5000);
       }
     }
-  }, [githubToken]);
+  }, [githubToken, profile]);
 
   const deleteEntry = useCallback(async (id) => {
     let deleted;
     setEntries(prev => {
       deleted = prev.find(e => e.id === id);
       const next = prev.filter(e => e.id !== id);
-      const d = loadData();
+      const d = loadProfileData(profile);
       d.entries = { ...(d.entries || {}), [todayKey()]: next };
-      saveData(d); return next;
+      saveProfileData(profile, d); return next;
     });
     if (githubToken && deleted) {
-      try { const { deleteEntry: ghDelete } = await import('./github.js'); await ghDelete(githubToken, deleted); } catch {}
+      try {
+        const { deleteEntry: ghDelete } = await import('./github.js');
+        await ghDelete(githubToken, deleted, profile);
+      } catch {}
     }
-  }, [githubToken]);
+  }, [githubToken, profile]);
 
-  const handleSaveSettings = useCallback((key, kcalGoal, ghToken) => {
-    setApiKey(key); setGoal(kcalGoal); setGithubToken(ghToken);
-    const d = loadData();
-    Object.assign(d, { apiKey: key, goal: kcalGoal, githubToken: ghToken });
-    saveData(d);
-  }, []);
+  const handleSaveSettings = useCallback((key, kcalGoal) => {
+    setApiKey(key); setGoal(kcalGoal);
+    const d = loadProfileData(profile);
+    Object.assign(d, { apiKey: key, goal: kcalGoal });
+    saveProfileData(profile, d);
+  }, [profile]);
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Guten Morgen!' : hour < 18 ? 'Guten Tag!' : 'Guten Abend!';
-  const IC = { size: 22, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
+  const IC = { size: 22, strokeWidth: 2 };
+  const profileColor = profile === 'kai' ? '#15803d' : '#7c3aed';
 
   return (
     <div className="app">
       <header className="header">
         <div className="header-top">
           <div>
-            <div className="header-greeting">{greeting}</div>
+            <div className="header-greeting">{greeting}, {label}!</div>
             <div className="header-name">Kalorienbash</div>
           </div>
           <div className="header-actions">
@@ -169,7 +187,18 @@ export default function App() {
             <button className="header-action-btn" onClick={() => setTab('settings')} title="Einstellungen">
               <SettingsIcon size={20} strokeWidth={2} color="#374151" />
             </button>
+            <button className="header-action-btn" onClick={onLogout} title="Abmelden"
+              style={{ background: '#fef2f2' }}>
+              <LogOut size={20} strokeWidth={2} color="#b91c1c" />
+            </button>
           </div>
+        </div>
+        {/* Profile chip */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+          <div style={{ width: 24, height: 24, borderRadius: '50%', background: profileColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <User size={13} strokeWidth={2} color="white" />
+          </div>
+          <span style={{ fontSize: '0.78rem', fontWeight: 600, color: profileColor }}>{label}</span>
         </div>
         <WeekStrip />
       </header>
@@ -257,8 +286,8 @@ export default function App() {
       )}
 
       {tab === 'add'      && <AddFood apiKey={apiKey} onAdd={addEntry} />}
-      {tab === 'history'  && <History githubToken={githubToken} goal={goal} />}
-      {tab === 'settings' && <Settings apiKey={apiKey} githubToken={githubToken} goal={goal} onSave={handleSaveSettings} />}
+      {tab === 'history'  && <History githubToken={githubToken} goal={goal} profile={profile} />}
+      {tab === 'settings' && <Settings apiKey={apiKey} githubToken={githubToken} goal={goal} onSave={handleSaveSettings} profile={profile} label={label} />}
 
       <nav className="bottom-nav">
         <button className={`nav-pill-add ${tab === 'add' ? 'active' : ''}`} onClick={() => setTab('add')}>

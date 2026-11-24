@@ -10,18 +10,18 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export default function History({ githubToken, goal }) {
+export default function History({ githubToken, goal, profile }) {
   const [days, setDays] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(null);
 
   const load = async () => {
-    if (!githubToken) { setError('Bitte GitHub Token in den Einstellungen eintragen.'); return; }
+    if (!githubToken) { setError('Bitte GitHub Token einrichten (Logout → Profil wählen).'); return; }
     setLoading(true); setError('');
     try {
       const { loadHistory } = await import('../github.js');
-      setDays(await loadHistory(githubToken));
+      setDays(await loadHistory(githubToken, profile));
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
