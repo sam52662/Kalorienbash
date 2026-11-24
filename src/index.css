@@ -17,7 +17,7 @@
   --orange: #f97316;
   --blue:   #3b82f6;
 
-  --nav-h:  76px;
+  --nav-h:  92px;
   --r-sm:   12px;
   --r-md:   18px;
   --r-lg:   24px;
@@ -459,37 +459,70 @@ body {
 /* ── Bottom Nav ──────────────────────────────────────── */
 .bottom-nav {
   position: fixed;
-  bottom: 0; left: 50%; transform: translateX(-50%);
-  width: 100%; max-width: 430px;
-  height: var(--nav-h);
-  background: #111827;
-  display: flex; align-items: center; justify-content: space-around;
-  padding: 0 8px 10px;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 406px;
+  height: 68px;
+  background: white;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  gap: 2px;
   z-index: 100;
-  border-radius: 24px 24px 0 0;
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+  border-radius: 999px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08);
 }
-.nav-item {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 8px 4px; border: none; background: none; cursor: pointer;
-  color: #6b7280; font-size: 0.65rem; font-weight: 600; font-family: inherit;
-  letter-spacing: 0.03em; text-transform: uppercase; transition: color 0.15s;
-}
-.nav-item.active { color: white; }
-.nav-icon { font-size: 1.3rem; }
-.nav-add-btn {
-  width: 52px; height: 52px; border-radius: 50%;
-  background: var(--brand);
-  border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.6rem; color: white; font-weight: 300;
-  box-shadow: 0 4px 16px rgba(34,197,94,0.5);
+
+/* Add button — green tile */
+.nav-pill-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 14px;
+  min-width: 72px;
+  height: 52px;
+  background: var(--brand-bg);
+  border: none;
+  border-radius: 999px;
+  color: var(--brand-dark);
+  font-size: 0.65rem;
+  font-weight: 800;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  cursor: pointer;
   flex-shrink: 0;
   transition: all 0.15s;
-  margin-bottom: 8px;
-  line-height: 1;
 }
-.nav-add-btn:active { transform: scale(0.92); }
+.nav-pill-add.active,
+.nav-pill-add:active { background: var(--brand-200); }
+
+/* Regular nav items */
+.nav-pill-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  height: 52px;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  font-size: 0.6rem;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: color 0.15s;
+}
+.nav-pill-item.active { color: var(--text-1); font-weight: 700; }
+.nav-pill-item:active { color: var(--brand-dark); }
 
 /* sync */
 .sync-pill {
