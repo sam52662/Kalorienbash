@@ -2,6 +2,10 @@ import { useState } from 'react';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (dateStr === today) return 'Heute';
+  if (dateStr === yesterday) return 'Gestern';
   return d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
@@ -17,8 +21,7 @@ export default function History({ githubToken, goal }) {
     setError('');
     try {
       const { loadHistory } = await import('../github.js');
-      const data = await loadHistory(githubToken);
-      setDays(data);
+      setDays(await loadHistory(githubToken));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -26,35 +29,33 @@ export default function History({ githubToken, goal }) {
     }
   };
 
-  if (!days && !loading) {
+  if (loading) {
     return (
-      <div className="log-section">
+      <div className="loading">
+        <div className="spinner" />
+        <p>Lade Verlauf…</p>
+      </div>
+    );
+  }
+
+  if (!days) {
+    return (
+      <div className="page">
         {error && <div className="error">⚠️ {error}</div>}
-        <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-          <div style={{ fontSize: '3rem', marginBottom: 8 }}>📅</div>
-          <p style={{ color: 'var(--gray-500)', marginBottom: 16 }}>Verlauf aus GitHub laden</p>
-          <button className="analyze-btn" style={{ width: '100%' }} onClick={load}>
-            Verlauf laden
-          </button>
+        <div className="log-empty">
+          <div className="log-empty-icon">📅</div>
+          <p style={{ marginBottom: 20 }}>Verlauf aus GitHub laden</p>
+          <button className="btn-primary" onClick={load}>Verlauf laden</button>
         </div>
       </div>
     );
   }
 
-  if (loading) {
+  if (days.length === 0) {
     return (
-      <div className="loading" style={{ padding: 40 }}>
-        <div className="spinner" />
-        <p style={{ marginTop: 8 }}>Lade Verlauf...</p>
-      </div>
-    );
-  }
-
-  if (days && days.length === 0) {
-    return (
-      <div className="log-section">
+      <div className="page">
         <div className="log-empty">
-          <div style={{ fontSize: '3rem', marginBottom: 8 }}>📭</div>
+          <div className="log-empty-icon">📭</div>
           <p>Noch keine Einträge gespeichert.</p>
         </div>
       </div>
@@ -62,12 +63,10 @@ export default function History({ githubToken, goal }) {
   }
 
   return (
-    <div className="log-section">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div className="log-date">Verlauf ({days.length} Tage)</div>
-        <button onClick={load} style={{ background: 'none', border: 'none', color: 'var(--green)', fontSize: '0.85rem', cursor: 'pointer' }}>
-          ↻ Aktualisieren
-        </button>
+    <div className="page">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div className="section-label">{days.length} Tage gespeichert</div>
+        <button className="refresh-btn" onClick={load}>↻ Aktualisieren</button>
       </div>
 
       {error && <div className="error">⚠️ {error}</div>}
@@ -77,33 +76,34 @@ export default function History({ githubToken, goal }) {
         const pct = Math.min((day.total / goal) * 100, 100);
         const isOpen = expanded === day.date;
         return (
-          <div key={day.date} className="log-item" style={{ flexDirection: 'column', alignItems: 'stretch', cursor: 'pointer', gap: 8 }}
-            onClick={() => setExpanded(isOpen ? null : day.date)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div className="log-item-icon" style={{ fontSize: '1.2rem' }}>📅</div>
-              <div className="log-item-info">
-                <div className="log-item-name">{formatDate(day.date)}</div>
-                <div className="log-item-time">{day.entries.length} Mahlzeit{day.entries.length !== 1 ? 'en' : ''}</div>
+          <div key={day.date} className="history-item" onClick={() => setExpanded(isOpen ? null : day.date)}>
+            <div className="history-top">
+              <div className="history-icon">📅</div>
+              <div className="history-info">
+                <div className="history-date">{formatDate(day.date)}</div>
+                <div className="history-meals">{day.entries.length} Mahlzeit{day.entries.length !== 1 ? 'en' : ''}</div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className="log-item-kcal" style={isOver ? { color: 'var(--red)' } : {}}>{day.total} kcal</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>{isOpen ? '▲' : '▼'}</div>
+              <div>
+                <div className={`history-kcal ${isOver ? 'over' : 'ok'}`}>{day.total} kcal</div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', textAlign: 'right', marginTop: 2 }}>
+                  {isOpen ? '▲' : '▼'}
+                </div>
               </div>
             </div>
 
-            <div className="progress-bar">
-              <div className={`progress-fill ${isOver ? 'over' : ''}`} style={{ width: `${pct}%` }} />
+            <div className="history-track">
+              <div className={`history-fill ${isOver ? 'over' : 'ok'}`} style={{ width: `${pct}%` }} />
             </div>
 
             {isOpen && (
-              <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="history-entries">
                 {day.entries.map((e, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--gray-700)' }}>
-                      <span style={{ color: 'var(--gray-500)', marginRight: 6 }}>{e.time}</span>
-                      {e.name}
+                  <div key={i} className="history-entry-row">
+                    <span>
+                      <span className="history-entry-time">{e.time}</span>
+                      <span className="history-entry-name">{e.name}</span>
                     </span>
-                    <span style={{ fontWeight: 600, color: 'var(--green-dark)' }}>{e.calories} kcal</span>
+                    <span className="history-entry-kcal">{e.calories} kcal</span>
                   </div>
                 ))}
               </div>

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { analyzeImage, analyzeText } from '../gemini';
 
 export default function AddFood({ apiKey, onAdd }) {
-  const [image, setImage] = useState(null); // { base64, mimeType, preview }
+  const [image, setImage] = useState(null);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -13,14 +13,13 @@ export default function AddFood({ apiKey, onAdd }) {
     input.type = 'file';
     input.accept = 'image/*';
     input.capture = 'environment';
-    input.onchange = async (e) => {
+    input.onchange = (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (ev) => {
         const dataUrl = ev.target.result;
-        const base64 = dataUrl.split(',')[1];
-        setImage({ base64, mimeType: file.type, preview: dataUrl });
+        setImage({ base64: dataUrl.split(',')[1], mimeType: file.type, preview: dataUrl });
         setResult(null);
         setError('');
       };
@@ -30,21 +29,14 @@ export default function AddFood({ apiKey, onAdd }) {
   }, []);
 
   const handleAnalyze = useCallback(async () => {
-    if (!apiKey) { setError('Bitte zuerst den API-Key in den Einstellungen eingeben.'); return; }
+    if (!apiKey) { setError('Bitte zuerst den Gemini API-Key in den Einstellungen eingeben.'); return; }
     setLoading(true);
     setError('');
     setResult(null);
     try {
-      let res;
-      if (image) {
-        res = await analyzeImage(apiKey, image.base64, image.mimeType);
-      } else if (text.trim()) {
-        res = await analyzeText(apiKey, text.trim());
-      } else {
-        setError('Bitte ein Foto aufnehmen oder Essen eingeben.');
-        setLoading(false);
-        return;
-      }
+      const res = image
+        ? await analyzeImage(apiKey, image.base64, image.mimeType)
+        : await analyzeText(apiKey, text.trim());
       setResult(res);
     } catch (err) {
       setError(err.message);
@@ -69,12 +61,13 @@ export default function AddFood({ apiKey, onAdd }) {
   }, [result, image, onAdd]);
 
   return (
-    <div className="add-section">
-      <div className="add-card">
-        <h2>Essen hinzufügen</h2>
+    <div className="page">
+      <div className="card">
+        <div className="card-title">Foto aufnehmen</div>
 
         <button className="camera-btn" onClick={handleCamera}>
-          📷 Foto aufnehmen
+          <span className="camera-btn-icon">📷</span>
+          Essen fotografieren
         </button>
 
         {image && (
@@ -83,48 +76,41 @@ export default function AddFood({ apiKey, onAdd }) {
             <button className="remove-img" onClick={() => { setImage(null); setResult(null); }}>✕</button>
           </div>
         )}
+      </div>
 
-        <div className="divider">— oder —</div>
+      <div className="card">
+        <div className="card-title">Oder manuell eingeben</div>
 
-        <div className="text-input-row">
-          <input
-            className="food-input"
-            placeholder="z.B. 200g Hähnchenbrust"
-            value={text}
-            onChange={e => { setText(e.target.value); setResult(null); }}
-            onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
-          />
-        </div>
+        <input
+          className="food-input"
+          placeholder="z.B. 200g Hähnchenbrust, Pizza Margherita…"
+          value={text}
+          onChange={e => { setText(e.target.value); setResult(null); }}
+          onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
+        />
 
         <button
-          className="analyze-btn"
-          style={{ width: '100%', marginTop: 10 }}
+          className="btn-primary"
           onClick={handleAnalyze}
           disabled={loading || (!image && !text.trim())}
         >
-          {loading ? 'Analysiere...' : '🔍 Kalorien berechnen'}
+          {loading ? <><span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> Analysiere…</> : '✦ Kalorien berechnen'}
         </button>
 
-        {loading && (
-          <div className="loading">
-            <div className="spinner" />
-            <p style={{ marginTop: 8 }}>KI analysiert...</p>
-          </div>
-        )}
-
         {error && <div className="error">⚠️ {error}</div>}
-
-        {result && (
-          <div className="result-card">
-            <div className="result-name">{result.name}</div>
-            <div className="result-kcal">{result.calories} kcal</div>
-            {result.note && <div className="result-note">{result.note}</div>}
-            <button className="add-entry-btn" onClick={handleAdd}>
-              + Zum Tagebuch hinzufügen
-            </button>
-          </div>
-        )}
       </div>
+
+      {result && (
+        <div className="result-card">
+          <div className="result-name">{result.name}</div>
+          <div>
+            <span className="result-kcal">{result.calories}</span>
+            <span className="result-unit"> kcal</span>
+          </div>
+          {result.note && <div className="result-note">{result.note}</div>}
+          <button className="btn-add" onClick={handleAdd}>+ Zum Tagebuch hinzufügen</button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import AddFood from './components/AddFood';
 import FoodLog from './components/FoodLog';
 import History from './components/History';
@@ -12,30 +12,33 @@ function loadData() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
   catch { return {}; }
 }
-
 function saveData(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+const NAV = [
+  { id: 'add',     icon: '＋',  label: 'Hinzufügen' },
+  { id: 'log',     icon: '📋',  label: 'Heute' },
+  { id: 'history', icon: '📅',  label: 'Verlauf' },
+  { id: 'settings',icon: '⚙️', label: 'Settings' },
+];
+
 export default function App() {
   const [tab, setTab] = useState('add');
-  const [entries, setEntries] = useState(() => {
-    const d = loadData();
-    return d.entries?.[todayKey()] || [];
-  });
-  const [apiKey, setApiKey] = useState(() => loadData().apiKey || '');
+  const [entries, setEntries] = useState(() => loadData().entries?.[todayKey()] || []);
+  const [apiKey, setApiKey]           = useState(() => loadData().apiKey || '');
   const [githubToken, setGithubToken] = useState(() => loadData().githubToken || '');
-  const [goal, setGoal] = useState(() => loadData().goal || 2000);
-  const [syncStatus, setSyncStatus] = useState('');
+  const [goal, setGoal]               = useState(() => loadData().goal || 2000);
+  const [syncStatus, setSyncStatus]   = useState(null); // {msg, type}
 
   const totalCalories = entries.reduce((s, e) => s + e.calories, 0);
   const progress = Math.min((totalCalories / goal) * 100, 100);
   const isOver = totalCalories > goal;
 
   const addEntry = useCallback(async (entry) => {
-    const entryWithDate = { ...entry, date: todayKey() };
+    const full = { ...entry, date: todayKey() };
     setEntries(prev => {
-      const next = [...prev, entryWithDate];
+      const next = [...prev, full];
       const d = loadData();
       d.entries = { ...(d.entries || {}), [todayKey()]: next };
       saveData(d);
@@ -44,15 +47,15 @@ export default function App() {
     setTab('log');
 
     if (githubToken) {
-      setSyncStatus('Speichere in GitHub...');
+      setSyncStatus({ msg: 'Speichere…', type: 'ok' });
       try {
         const { appendEntry } = await import('./github.js');
-        await appendEntry(githubToken, entryWithDate);
-        setSyncStatus('✓ In GitHub gespeichert');
-        setTimeout(() => setSyncStatus(''), 3000);
+        await appendEntry(githubToken, full);
+        setSyncStatus({ msg: '✓ In GitHub gespeichert', type: 'ok' });
+        setTimeout(() => setSyncStatus(null), 3000);
       } catch (e) {
-        setSyncStatus('⚠️ GitHub-Sync fehlgeschlagen: ' + e.message);
-        setTimeout(() => setSyncStatus(''), 5000);
+        setSyncStatus({ msg: '⚠️ Sync fehlgeschlagen', type: 'err' });
+        setTimeout(() => setSyncStatus(null), 5000);
       }
     }
   }, [githubToken]);
@@ -67,7 +70,6 @@ export default function App() {
       saveData(d);
       return next;
     });
-
     if (githubToken && deleted) {
       try {
         const { deleteEntry: ghDelete } = await import('./github.js');
@@ -79,63 +81,76 @@ export default function App() {
   }, [githubToken]);
 
   const handleSaveSettings = useCallback((key, kcalGoal, ghToken) => {
-    setApiKey(key);
-    setGoal(kcalGoal);
-    setGithubToken(ghToken);
+    setApiKey(key); setGoal(kcalGoal); setGithubToken(ghToken);
     const d = loadData();
-    d.apiKey = key;
-    d.goal = kcalGoal;
-    d.githubToken = ghToken;
+    Object.assign(d, { apiKey: key, goal: kcalGoal, githubToken: ghToken });
     saveData(d);
   }, []);
 
+  const dateLabel = new Date().toLocaleDateString('de-DE', {
+    weekday: 'long', day: 'numeric', month: 'long'
+  });
+
   return (
     <div className="app">
+      {/* Header */}
       <header className="header">
-        <h1>🥗 Kalorienbash</h1>
-        <div className="header-right">
-          <button
-            style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.3rem', cursor: 'pointer' }}
-            onClick={() => setTab('settings')}
-            title="Einstellungen"
-          >⚙️</button>
+        <div className="header-top">
+          <div className="header-title">
+            <div className="header-icon">🥗</div>
+            <h1>Kalorienbash</h1>
+          </div>
+          <button className="header-settings-btn" onClick={() => setTab('settings')}>⚙️</button>
+        </div>
+
+        {/* Summary inside header */}
+        <div className="summary-card">
+          <div className="summary-date">{dateLabel}</div>
+          <div className="calorie-row">
+            <div className="calorie-left">
+              <span className={`calorie-number ${isOver ? 'over' : ''}`}>{totalCalories}</span>
+              <span className="calorie-unit">kcal</span>
+            </div>
+            <div className="calorie-right">
+              <div className="calorie-goal-label">Tagesziel</div>
+              <div className="calorie-goal-val">{goal} kcal</div>
+            </div>
+          </div>
+          <div className="progress-track">
+            <div className={`progress-fill ${isOver ? 'over' : ''}`} style={{ width: `${progress}%` }} />
+          </div>
+          <div className="calorie-status">
+            {isOver
+              ? `${totalCalories - goal} kcal über dem Ziel`
+              : `Noch ${goal - totalCalories} kcal verfügbar`}
+          </div>
+          {syncStatus && (
+            <div className={`sync-status ${syncStatus.type}`} style={{ marginTop: 8 }}>
+              {syncStatus.msg}
+            </div>
+          )}
         </div>
       </header>
 
-      <div className="summary">
-        <div className="summary-title">Heute — {new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
-        <div className="calorie-display">
-          <span className="calorie-number" style={isOver ? { color: 'var(--red)' } : {}}>
-            {totalCalories}
-          </span>
-          <span className="calorie-unit">kcal</span>
-        </div>
-        <div className="calorie-goal">
-          Ziel: {goal} kcal · {isOver ? `${totalCalories - goal} kcal über Ziel` : `noch ${goal - totalCalories} kcal`}
-        </div>
-        <div className="progress-bar" style={{ marginTop: 8 }}>
-          <div className={`progress-fill ${isOver ? 'over' : ''}`} style={{ width: `${progress}%` }} />
-        </div>
-        {syncStatus && (
-          <div style={{ fontSize: '0.78rem', marginTop: 6, color: syncStatus.startsWith('⚠️') ? 'var(--red)' : 'var(--green-dark)' }}>
-            {syncStatus}
-          </div>
-        )}
-      </div>
-
-      <div className="tabs">
-        <button className={`tab ${tab === 'add' ? 'active' : ''}`} onClick={() => setTab('add')}>+ Hinzufügen</button>
-        <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>
-          Heute {entries.length > 0 && `(${entries.length})`}
-        </button>
-        <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>📅 Verlauf</button>
-        <button className={`tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>⚙️</button>
-      </div>
-
-      {tab === 'add' && <AddFood apiKey={apiKey} onAdd={addEntry} />}
-      {tab === 'log' && <FoodLog entries={entries} onDelete={deleteEntry} />}
-      {tab === 'history' && <History githubToken={githubToken} goal={goal} />}
+      {/* Page content */}
+      {tab === 'add'      && <AddFood apiKey={apiKey} onAdd={addEntry} />}
+      {tab === 'log'      && <FoodLog entries={entries} onDelete={deleteEntry} />}
+      {tab === 'history'  && <History githubToken={githubToken} goal={goal} />}
       {tab === 'settings' && <Settings apiKey={apiKey} githubToken={githubToken} goal={goal} onSave={handleSaveSettings} />}
+
+      {/* Bottom Nav */}
+      <nav className="bottom-nav">
+        {NAV.map(n => (
+          <button
+            key={n.id}
+            className={`nav-item ${tab === n.id ? 'active' : ''}`}
+            onClick={() => setTab(n.id)}
+          >
+            <span className="nav-icon">{n.icon}</span>
+            {n.label}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
