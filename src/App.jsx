@@ -93,7 +93,20 @@ export default function App() {
   const [apiKey, setApiKey]             = useState(() => loadData().apiKey || '');
   const [githubToken, setGithubToken]   = useState(() => loadData().githubToken || '');
   const [goal, setGoal]                 = useState(() => loadData().goal || 2000);
+  const [editingGoal, setEditingGoal]   = useState(false);
+  const [goalDraft, setGoalDraft]       = useState('');
   const [syncStatus, setSyncStatus]     = useState(null);
+
+  const commitGoal = useCallback(() => {
+    const val = parseInt(goalDraft, 10);
+    if (val >= 100 && val <= 9999) {
+      setGoal(val);
+      const d = loadData();
+      d.goal = val;
+      saveData(d);
+    }
+    setEditingGoal(false);
+  }, [goalDraft]);
 
   const totalCalories = entries.reduce((s, e) => s + e.calories, 0);
 
@@ -173,7 +186,24 @@ export default function App() {
           <div className="gauge-card">
             <div className="gauge-header">
               <span className="gauge-title">Kalorien</span>
-              <button className="gauge-edit-btn" onClick={() => setTab('settings')}>Bearbeiten</button>
+              {editingGoal ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    autoFocus
+                    type="number"
+                    min="100" max="9999"
+                    value={goalDraft}
+                    onChange={e => setGoalDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') commitGoal(); if (e.key === 'Escape') setEditingGoal(false); }}
+                    style={{ width: 80, padding: '4px 8px', border: '1.5px solid var(--brand)', borderRadius: 8, fontSize: '0.9rem', fontFamily: 'inherit', outline: 'none', textAlign: 'center' }}
+                  />
+                  <button className="gauge-edit-btn" onClick={commitGoal} style={{ background: 'var(--brand-dark)', color: 'white', border: 'none' }}>✓</button>
+                </div>
+              ) : (
+                <button className="gauge-edit-btn" onClick={() => { setGoalDraft(String(goal)); setEditingGoal(true); }}>
+                  Ziel: {goal} kcal
+                </button>
+              )}
             </div>
             <Gauge value={totalCalories} goal={goal} />
             <div className="macro-row">
