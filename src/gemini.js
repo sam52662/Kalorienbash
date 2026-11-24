@@ -1,5 +1,5 @@
-const MODEL = 'gemini-3.8-flash';
-const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+const MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.8-flash'];
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
 
